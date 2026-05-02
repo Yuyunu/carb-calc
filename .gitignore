@@ -1,0 +1,7 @@
+_開發日誌.md
+*_DEPRECATED.xlsx
+常用食材清單_*.xlsx
+*.tmp
+.DS_Store
+node_modules/
+_work/

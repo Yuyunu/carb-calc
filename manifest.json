@@ -1,0 +1,33 @@
+{
+  "name": "糖尿病醣類計算器",
+  "short_name": "醣類計算",
+  "description": "第 1 型糖尿病碳水/胰島素紀錄與 I:C 推算工具（個人用，胰島素幫浦 0.1U 精度）",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFAF0",
+  "theme_color": "#FFC107",
+  "lang": "zh-TW",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["health", "medical", "lifestyle"]
+}

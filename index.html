@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FFC107">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="醣類計算">
+  <meta name="description" content="第 1 型糖尿病碳水/胰島素紀錄與 I:C 推算工具（個人用）">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>糖尿病醣類計算器</title>
+</head>
+<body>
+
+  <!-- ===== 醫療免責 modal（首次開啟才顯示）===== -->
+  <div id="disclaimer-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <h2>使用前請閱讀</h2>
+      <p class="modal-body">本工具僅供<strong>個人記錄與輔助參考</strong>，不取代醫療專業判斷。</p>
+      <p class="modal-body">所有「建議劑量」、「最佳劑量」、I:C ratio 等數據均為統計輔助，<strong>任何實際劑量調整請與您的內分泌科醫師討論</strong>。</p>
+      <p class="modal-body small">本工具設計給胰島素幫浦使用者（最小單位 0.1U）。</p>
+      <label class="checkbox-row">
+        <input type="checkbox" id="disclaimer-check">
+        <span>我已了解，這是個人記錄工具，不是醫療裝置</span>
+      </label>
+      <button id="disclaimer-ok" class="btn-primary" disabled>開始使用</button>
+    </div>
+  </div>
+
+  <!-- ===== 頂部 bar ===== -->
+  <header class="app-header">
+    <div class="header-left">
+      <span class="header-emoji" aria-hidden="true">🍠</span>
+      <h1 class="header-title">醣類計算器</h1>
+    </div>
+    <div class="header-right">
+      <button id="theme-toggle" class="header-btn" title="切換暗色模式" aria-label="切換暗色模式">
+        <span class="theme-icon-light">☀</span>
+        <span class="theme-icon-dark">🌙</span>
+      </button>
+      <button id="refresh-btn" class="header-btn" title="重新整理（清 cache）" aria-label="重新整理">↻</button>
+    </div>
+  </header>
+
+  <!-- ===== 主內容區 ===== -->
+  <main class="app-main">
+
+    <!-- Tab 1 — 計算器 -->
+    <section id="tab-calculator" class="tab-panel active" role="tabpanel" aria-labelledby="nav-calculator">
+
+      <!-- 搜尋 + 顯示切換 -->
+      <div class="calc-search-bar">
+        <input type="search" id="calc-search" placeholder="🔍 搜尋食材（中/英）" autocomplete="off">
+        <div class="filter-toggle" role="tablist">
+          <button class="filter-btn active" data-filter="common" role="tab">常用</button>
+          <button class="filter-btn" data-filter="all" role="tab">全部</button>
+        </div>
+      </div>
+
+      <!-- 分類 tabs -->
+      <div class="cat-tabs" id="cat-tabs" role="tablist"></div>
+
+      <!-- 食材 chip 區 -->
+      <div class="chip-area" id="chip-area"></div>
+      <p id="chip-empty" class="chip-empty muted small hidden">沒有相符食材，試試其他關鍵字或切「全部」。</p>
+
+      <!-- 已選食材 -->
+      <h3 class="section-title">已選食材</h3>
+      <div id="selected-list" class="selected-list">
+        <p class="empty-hint muted">尚未選擇食材。從上方挑選或搜尋 →</p>
+      </div>
+
+      <!-- 總計卡片 -->
+      <div id="totals-card" class="totals-card hidden">
+        <div class="totals-grid">
+          <div class="total-cell">
+            <div class="total-label">總碳水</div>
+            <div class="total-value" id="t-carb">0 g</div>
+          </div>
+          <div class="total-cell">
+            <div class="total-label">淨碳水</div>
+            <div class="total-value" id="t-net-carb">0 g</div>
+          </div>
+          <div class="total-cell">
+            <div class="total-label">加權 GI</div>
+            <div class="total-value" id="t-gi">—</div>
+          </div>
+          <div class="total-cell">
+            <div class="total-label">GL</div>
+            <div class="total-value" id="t-gl">—</div>
+          </div>
+        </div>
+        <div class="totals-secondary">
+          <span><span class="muted">熱量</span> <span id="t-kcal" class="strong">0 kcal</span></span>
+          <span><span class="muted">蛋白質</span> <span id="t-protein" class="strong">0 g</span></span>
+          <span><span class="muted">脂肪</span> <span id="t-fat" class="strong">0 g</span></span>
+        </div>
+
+        <div class="pie-row">
+          <svg id="pie" class="pie" viewBox="0 0 42 42" aria-hidden="true">
+            <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--bd-card)" stroke-width="6"/>
+          </svg>
+          <ul id="pie-legend" class="pie-legend"></ul>
+        </div>
+      </div>
+
+      <!-- 建議劑量卡片 -->
+      <div id="dose-card" class="dose-card hidden">
+        <div class="dose-header">
+          <span class="dose-meal" id="dose-meal-label">午餐</span>
+          <span class="dose-ic" id="dose-ic-label">I:C 1:10.0</span>
+        </div>
+        <div class="dose-value-row">
+          <div class="dose-big" id="dose-big">0.0</div>
+          <div class="dose-unit">U</div>
+        </div>
+        <p class="dose-disclaimer">⚠ 此為依碳水量 × I:C 的估算建議，請與醫師確認。實際劑量須由您決定，本工具不做自動劑量決定。</p>
+      </div>
+
+      <!-- 操作按鈕 -->
+      <div class="calc-actions hidden" id="calc-actions">
+        <button class="btn-primary" id="btn-add-record">📋 加入紀錄</button>
+        <button class="btn-secondary" id="btn-clear-calc">清除</button>
+      </div>
+
+    </section>
+
+    <!-- 食材詳情 modal -->
+    <div id="food-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card food-modal-card">
+        <button class="modal-close" id="food-modal-close" aria-label="關閉">✕</button>
+        <h2 id="fm-name">食材名稱</h2>
+        <div class="fm-cat-row">
+          <span id="fm-cat-chip" class="cat-chip">分類</span>
+          <span id="fm-state" class="muted small">生/熟</span>
+        </div>
+        <div class="fm-grid">
+          <div class="fm-cell"><div class="fm-label">熱量</div><div class="fm-val" id="fm-kcal">—</div></div>
+          <div class="fm-cell"><div class="fm-label">碳水</div><div class="fm-val" id="fm-carb">—</div></div>
+          <div class="fm-cell"><div class="fm-label">膳食纖維</div><div class="fm-val" id="fm-fiber">—</div></div>
+          <div class="fm-cell"><div class="fm-label">淨碳水</div><div class="fm-val" id="fm-net">—</div></div>
+          <div class="fm-cell"><div class="fm-label">蛋白質</div><div class="fm-val" id="fm-protein">—</div></div>
+          <div class="fm-cell"><div class="fm-label">脂肪</div><div class="fm-val" id="fm-fat">—</div></div>
+          <div class="fm-cell"><div class="fm-label">鈉</div><div class="fm-val" id="fm-sodium">—</div></div>
+          <div class="fm-cell"><div class="fm-label">水分</div><div class="fm-val" id="fm-water">—</div></div>
+        </div>
+        <p class="fm-per100">數值為每 100g</p>
+        <div class="fm-gi-row">
+          <div>
+            <div class="fm-label">GI</div>
+            <div class="fm-val fm-gi" id="fm-gi">—</div>
+          </div>
+          <div class="fm-gi-meta">
+            <div id="fm-gi-conf" class="fm-gi-confidence">—</div>
+            <div id="fm-gi-source" class="muted small">—</div>
+          </div>
+        </div>
+        <div id="fm-override-row" class="fm-override-row hidden">
+          <p class="muted small">這筆 GI 是估計值。可依妳的觀察輸入個人值（暫存本機）。</p>
+          <label class="field-row">
+            <span class="field-label">我的 GI</span>
+            <input type="number" id="fm-override-input" min="0" max="120" step="1" placeholder="留空 = 跟系統值">
+          </label>
+          <div class="btn-row">
+            <button class="btn-primary" id="fm-override-save">儲存</button>
+            <button class="btn-secondary" id="fm-override-clear">重置</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2 — 紀錄 -->
+    <section id="tab-records" class="tab-panel" role="tabpanel" aria-labelledby="nav-records" hidden>
+
+      <div class="records-toolbar">
+        <input type="search" id="rec-search" placeholder="🔍 搜尋餐名" autocomplete="off">
+        <select id="rec-filter-meal" class="select-pill">
+          <option value="">全部</option>
+          <option value="breakfast">🌅 早</option>
+          <option value="lunch">🌞 午</option>
+          <option value="dinner">🌙 晚</option>
+          <option value="late">🌃 宵</option>
+        </select>
+      </div>
+
+      <div id="records-list" class="records-list"></div>
+
+      <button id="record-fab" class="fab" title="新增紀錄" aria-label="新增紀錄">＋</button>
+    </section>
+
+    <!-- Tab 3 — 趨勢 -->
+    <section id="tab-trends" class="tab-panel" role="tabpanel" aria-labelledby="nav-trends" hidden>
+
+      <div class="trends-toolbar" role="tablist" aria-label="期間">
+        <button class="period-btn active" data-days="7">7 天</button>
+        <button class="period-btn" data-days="30">30 天</button>
+        <button class="period-btn" data-days="90">90 天</button>
+      </div>
+
+      <!-- 圖 1: I:C 折線 -->
+      <div class="trend-card">
+        <h3>📈 I:C ratio 趨勢（早 / 午 / 晚）</h3>
+        <div class="trend-canvas-wrap"><canvas id="chart-ic"></canvas></div>
+        <p class="trend-summary" id="chart-ic-summary"></p>
+      </div>
+
+      <!-- 圖 2: 碳水 vs 2h BG 散佈 -->
+      <div class="trend-card">
+        <h3>🎯 碳水 vs 餐後 2h BG</h3>
+        <div class="trend-canvas-wrap"><canvas id="chart-scatter"></canvas></div>
+        <p class="trend-summary" id="chart-scatter-summary"></p>
+      </div>
+
+      <!-- 圖 3: 單道菜歷史 -->
+      <div class="trend-card">
+        <h3>🍽️ 單道菜歷史（劑量與餐後 BG）</h3>
+        <select class="meal-selector" id="trend-meal-selector"></select>
+        <div class="trend-canvas-wrap"><canvas id="chart-meal"></canvas></div>
+        <p class="trend-summary" id="chart-meal-summary"></p>
+      </div>
+
+    </section>
+
+    <!-- Tab 4 — 設定 -->
+    <section id="tab-settings" class="tab-panel" role="tabpanel" aria-labelledby="nav-settings" hidden>
+
+      <h2 class="settings-section-title">個人</h2>
+      <div class="settings-card">
+        <label class="field-row">
+          <span class="field-label">暱稱</span>
+          <input type="text" id="set-nickname" placeholder="Yunu">
+        </label>
+        <div class="field-row">
+          <span class="field-label">使用裝置</span>
+          <div class="radio-group">
+            <label><input type="radio" name="device" value="pump" checked> 幫浦（0.1U）</label>
+            <label><input type="radio" name="device" value="pen" disabled> 注射筆 <span class="muted">v2</span></label>
+          </div>
+        </div>
+        <label class="field-row">
+          <span class="field-label">目標 BG（mg/dL）</span>
+          <span class="bg-range">
+            <input type="number" id="set-bg-low" min="40" max="200" step="1" value="70">
+            <span>–</span>
+            <input type="number" id="set-bg-high" min="80" max="300" step="1" value="180">
+          </span>
+        </label>
+        <label class="field-row">
+          <span class="field-label">預設 I:C 早</span>
+          <input type="text" id="set-ic-breakfast" value="1:8.0">
+        </label>
+        <label class="field-row">
+          <span class="field-label">預設 I:C 午</span>
+          <input type="text" id="set-ic-lunch" value="1:10.0">
+        </label>
+        <label class="field-row">
+          <span class="field-label">預設 I:C 晚</span>
+          <input type="text" id="set-ic-dinner" value="1:10.0">
+        </label>
+      </div>
+
+      <h2 class="settings-section-title">GitHub Gist 同步</h2>
+      <div class="settings-card">
+        <p class="muted small">紀錄、設定會自動同步到 GitHub Gist（私人）。換手機/裝置可同步同一份資料。</p>
+        <label class="field-row">
+          <span class="field-label">PAT</span>
+          <input type="password" id="sync-pat" placeholder="ghp_... 或 github_pat_...">
+        </label>
+        <p class="hint">需要 fine-grained PAT，scope 只勾「Gists: Read & Write」即可（最小權限）。
+        到 GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token。</p>
+        <div class="btn-row">
+          <button id="sync-test" class="btn-secondary">測試連線</button>
+          <button id="sync-pull" class="btn-secondary">下載</button>
+          <button id="sync-push" class="btn-primary">上傳</button>
+        </div>
+        <p>狀態：<span id="sync-status" class="status-line muted">未設定</span></p>
+        <p class="muted small">Gist ID：<span id="sync-gist-id">—</span> · 最近同步：<span id="sync-last">—</span></p>
+        <button id="sync-clear" class="btn-danger" style="margin-top:6px;">清除 PAT</button>
+      </div>
+
+      <h2 class="settings-section-title">☁ Cloudinary 雲端照片</h2>
+      <div class="settings-card">
+        <label class="field-row">
+          <span class="field-label">Cloud Name</span>
+          <input type="text" id="set-cd-cloud" autocomplete="off">
+        </label>
+        <label class="field-row">
+          <span class="field-label">Upload Preset</span>
+          <input type="text" id="set-cd-preset" autocomplete="off">
+        </label>
+        <div class="btn-row">
+          <button id="cd-test-btn" class="btn-primary">測試上傳</button>
+          <button id="cd-reset-btn" class="btn-secondary">恢復預設</button>
+        </div>
+        <p id="cd-status" class="status-line muted">尚未測試</p>
+        <p class="hint">第一次開 app 已自動填妥。免費 25GB，個人用一輩子用不完。要換帳號可改 Cloud Name + Preset。Preset 必須是 unsigned 類型。</p>
+      </div>
+
+      <h2 class="settings-section-title">食材庫</h2>
+      <div class="settings-card">
+        <p>食材總數：<span id="food-count" class="strong">…</span></p>
+        <p>GI 已確定：<span id="food-confirmed" class="strong">…</span></p>
+        <p>GI 待確認：<span id="food-estimated" class="strong">…</span></p>
+        <p class="muted small">資料來源：TFDA + USyd GI Database + 衛福部表 + 手動補主食熟食版本</p>
+      </div>
+
+      <h2 class="settings-section-title">常吃餐</h2>
+      <div class="settings-card">
+        <p>看妳吃過幾次的同道菜紀錄；之後 Phase 5 會用這些算最佳劑量。</p>
+        <button id="open-freq-meals-btn" class="btn-primary" style="margin-top: 8px;">
+          ⭐ 管理（<span id="freq-meals-count">0</span> 道）→
+        </button>
+      </div>
+
+      <h2 class="settings-section-title">我不吃的食材</h2>
+      <div class="settings-card">
+        <p>勾起來的食材會從計算器「常用」chip 區隱藏（搜尋仍找得到，可隨時再開）。</p>
+        <button id="open-exclusion-btn" class="btn-primary" style="margin-top: 8px;">
+          🍽️ 管理（<span id="exclusion-count">0</span> 筆已排除）→
+        </button>
+      </div>
+
+      <h2 class="settings-section-title">照片相似度</h2>
+      <div class="settings-card">
+        <label class="field-row">
+          <span class="field-label">pHash 門檻</span>
+          <span class="slider-row">
+            <input type="range" id="set-phash-th" min="5" max="15" step="1" value="8">
+            <span id="phash-th-val" class="strong">8</span>
+          </span>
+        </label>
+        <p class="muted small">≤5 幾乎一定同一道 / 6–8 很可能（預設）/ 9–12 可能相關 / ≥13 不顯示</p>
+        <p class="status-line">Phase 4 會啟用</p>
+      </div>
+
+      <h2 class="settings-section-title">顯示</h2>
+      <div class="settings-card">
+        <div class="field-row">
+          <span class="field-label">暗色模式</span>
+          <div class="radio-group">
+            <label><input type="radio" name="theme" value="auto" checked> 自動</label>
+            <label><input type="radio" name="theme" value="light"> 亮</label>
+            <label><input type="radio" name="theme" value="dark"> 暗</label>
+          </div>
+        </div>
+        <div class="field-row">
+          <span class="field-label">BG 單位</span>
+          <div class="radio-group">
+            <label><input type="radio" name="bgunit" value="mgdl" checked> mg/dL</label>
+            <label><input type="radio" name="bgunit" value="mmol" disabled> mmol/L <span class="muted">v2</span></label>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="settings-section-title">資料</h2>
+      <div class="settings-card">
+        <div class="btn-row">
+          <button class="btn-primary" disabled>匯出 JSON <span class="muted">v後續</span></button>
+          <button class="btn-primary" disabled>匯入 <span class="muted">v後續</span></button>
+        </div>
+        <button class="btn-danger" id="data-clear-btn">清除全部資料</button>
+        <p class="muted small">會清掉設定、紀錄、自訂食材。<strong>無法復原。</strong></p>
+      </div>
+
+      <h2 class="settings-section-title">關於</h2>
+      <div class="settings-card">
+        <p>版本 <span class="strong">0.2.0</span>（Phase 2 — PWA 框架）</p>
+        <p class="muted small">本工具僅供個人記錄與輔助參考，不取代醫療專業判斷。</p>
+        <p class="muted small">第 1 型糖尿病 / 胰島素幫浦（0.1U）/ CGM 監測使用者設計</p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ===== 底部 tab bar ===== -->
+  <nav class="tab-bar" role="tablist">
+    <button class="tab-btn active" id="nav-calculator" data-tab="tab-calculator" role="tab" aria-selected="true">
+      <span class="tab-icon">🧮</span>
+      <span class="tab-label">計算</span>
+    </button>
+    <button class="tab-btn" id="nav-records" data-tab="tab-records" role="tab" aria-selected="false">
+      <span class="tab-icon">📋</span>
+      <span class="tab-label">紀錄</span>
+    </button>
+    <button class="tab-btn" id="nav-trends" data-tab="tab-trends" role="tab" aria-selected="false">
+      <span class="tab-icon">📈</span>
+      <span class="tab-label">趨勢</span>
+    </button>
+    <button class="tab-btn" id="nav-settings" data-tab="tab-settings" role="tab" aria-selected="false">
+      <span class="tab-icon">⚙</span>
+      <span class="tab-label">設定</span>
+    </button>
+  </nav>
+
+  <!-- 新增/編輯紀錄 form — 全屏 modal -->
+  <div id="record-form-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card record-form-card">
+      <header class="rf-header">
+        <button class="rf-cancel" id="rf-cancel" aria-label="取消">✕</button>
+        <h2 id="rf-title">新增用餐</h2>
+        <button class="btn-primary rf-save" id="rf-save">存</button>
+      </header>
+
+      <div class="rf-body">
+
+        <!-- 餐名（自動建議） -->
+        <div class="rf-section">
+          <label class="rf-label">餐名</label>
+          <input type="text" id="rf-name" placeholder="例：午餐 0502">
+          <p class="rf-name-hint" id="rf-name-hint"><span id="rf-name-source">🆕</span> <span id="rf-name-source-text">建議名，可改</span></p>
+        </div>
+
+        <!-- 日期時間 + 餐別 -->
+        <div class="rf-section">
+          <div class="rf-row">
+            <label class="rf-label">日期時間</label>
+            <input type="datetime-local" id="rf-datetime">
+          </div>
+          <div class="rf-row">
+            <label class="rf-label">餐別</label>
+            <div class="meal-pills" id="rf-meal-pills">
+              <button class="meal-pill" data-meal="breakfast">🌅 早</button>
+              <button class="meal-pill" data-meal="lunch">🌞 午</button>
+              <button class="meal-pill" data-meal="dinner">🌙 晚</button>
+              <button class="meal-pill" data-meal="late">🌃 宵</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 照片 -->
+        <div class="rf-section">
+          <label class="rf-label">📷 照片（可選）</label>
+          <div class="rf-photo-row">
+            <input type="file" id="rf-photo-input" accept="image/*" capture="environment" hidden>
+            <input type="file" id="rf-photo-input-lib" accept="image/*" hidden>
+            <button class="btn-secondary" id="rf-photo-camera-btn">📷 拍照</button>
+            <button class="btn-secondary" id="rf-photo-lib-btn">🖼 從相簿</button>
+            <button class="btn-secondary" id="rf-photo-remove-btn" hidden>移除</button>
+          </div>
+          <div id="rf-photo-preview" class="rf-photo-preview hidden">
+            <img id="rf-photo-img" alt="">
+            <div class="rf-photo-meta">
+              <span id="rf-photo-status" class="muted small">準備中</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 食材 -->
+        <div class="rf-section">
+          <label class="rf-label">食材</label>
+          <div id="rf-foods-list" class="rf-foods-list">
+            <p class="empty-hint muted">尚未選食材，可從計算器頁帶入或這邊新增。</p>
+          </div>
+          <button class="btn-secondary" id="rf-add-food-btn">+ 新增食材</button>
+        </div>
+
+        <!-- 即時總計 -->
+        <div class="rf-totals" id="rf-totals">
+          <span><span class="muted">碳水</span> <strong id="rf-t-carb">0 g</strong></span>
+          <span><span class="muted">淨碳水</span> <strong id="rf-t-net">0 g</strong></span>
+          <span><span class="muted">GI</span> <strong id="rf-t-gi">—</strong></span>
+          <span><span class="muted">GL</span> <strong id="rf-t-gl">—</strong></span>
+        </div>
+
+        <!-- 胰島素 -->
+        <div class="rf-section">
+          <label class="rf-label">胰島素劑量</label>
+          <div class="dose-input-row">
+            <button class="gram-btn" data-dose-act="dec5">−.5</button>
+            <button class="gram-btn" data-dose-act="dec1">−.1</button>
+            <input type="number" id="rf-insulin" step="0.1" min="0" max="99.9" inputmode="decimal" placeholder="0.0">
+            <button class="gram-btn" data-dose-act="inc1">+.1</button>
+            <button class="gram-btn" data-dose-act="inc5">+.5</button>
+            <span class="gram-unit">U</span>
+          </div>
+          <p class="rf-ic-line muted small">I:C = <span id="rf-ic-display">—</span></p>
+          <p class="rf-bolus-line muted small">Bolus 類型：純（square / dual v2 再開放）</p>
+        </div>
+
+        <!-- 血糖 -->
+        <div class="rf-section">
+          <label class="rf-label">血糖（mg/dL）</label>
+          <div class="bg-row">
+            <label><span class="muted small">餐前</span><input type="number" id="rf-bg-pre" min="20" max="600"></label>
+            <label><span class="muted small">餐後 1h</span><input type="number" id="rf-bg-1h" min="20" max="600"></label>
+            <label><span class="muted small">餐後 2h</span><input type="number" id="rf-bg-2h" min="20" max="600"></label>
+          </div>
+        </div>
+
+        <!-- 備註 -->
+        <div class="rf-section">
+          <label class="rf-label">備註</label>
+          <div class="context-tags">
+            <button class="ctx-tag" data-ctx="exercise">🏃 運動</button>
+            <button class="ctx-tag" data-ctx="sick">🤒 生病</button>
+            <button class="ctx-tag" data-ctx="period">🩸 月經</button>
+            <button class="ctx-tag" data-ctx="alcohol">🍺 酒</button>
+            <button class="ctx-tag" data-ctx="stress">😰 壓力</button>
+          </div>
+          <textarea id="rf-note" rows="2" placeholder="自訂..."></textarea>
+        </div>
+
+        <!-- 編輯模式才顯示：刪除 -->
+        <div class="rf-section rf-delete-section hidden" id="rf-delete-section">
+          <button class="btn-danger" id="rf-delete">刪除這筆紀錄</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 食材 picker modal（form 內「+ 新增食材」用）-->
+  <div id="food-picker-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card exclusion-modal-card">
+      <div class="exclusion-header">
+        <h2>選食材</h2>
+        <button class="modal-close" id="fp-close" aria-label="關閉">✕</button>
+      </div>
+      <div class="exclusion-search-bar">
+        <input type="search" id="fp-search" placeholder="🔍 搜尋（中/英/別名）">
+      </div>
+      <div class="exclusion-cat-tabs" id="fp-cat-tabs"></div>
+      <div class="exclusion-list" id="fp-list"></div>
+    </div>
+  </div>
+
+  <!-- 相似建議 modal -->
+  <div id="similar-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card similar-modal-card">
+      <h2>📷 看起來像吃過的餐？</h2>
+      <p class="muted small">系統用照片比對找到相似紀錄。要歸到同一個餐名嗎？</p>
+      <div id="similar-list" class="similar-list"></div>
+      <div class="btn-row">
+        <button class="btn-secondary" id="similar-skip">都不是 / 新增餐名</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 紀錄詳情 modal （只看，含複製/編輯/刪除）-->
+  <div id="record-detail-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card record-detail-card">
+      <header class="rf-header">
+        <button class="rf-cancel" id="rd-close" aria-label="關閉">✕</button>
+        <h2 id="rd-title">紀錄詳情</h2>
+        <button class="btn-primary" id="rd-edit">編輯</button>
+      </header>
+      <div class="rf-body" id="rd-body"></div>
+    </div>
+  </div>
+
+  <!-- 常吃餐管理 modal -->
+  <div id="freq-meals-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card exclusion-modal-card">
+      <div class="exclusion-header">
+        <h2>⭐ 常吃餐管理</h2>
+        <button class="modal-close" id="fm-close" aria-label="關閉">✕</button>
+      </div>
+      <div class="exclusion-search-bar">
+        <input type="search" id="fm-search" placeholder="🔍 搜尋餐名">
+      </div>
+      <div class="exclusion-list" id="fm-list"></div>
+      <div class="exclusion-footer">
+        <span class="exclusion-stat" id="fm-stat">0 道餐 / 0 筆紀錄</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 我不吃的食材 — 全屏 modal -->
+  <div id="exclusion-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card exclusion-modal-card">
+      <div class="exclusion-header">
+        <h2>🍽️ 我不吃的食材</h2>
+        <button class="modal-close" id="exclusion-close" aria-label="關閉">✕</button>
+      </div>
+
+      <div class="exclusion-search-bar">
+        <input type="search" id="exclusion-search" placeholder="🔍 搜尋食材（中/英/別名）">
+      </div>
+      <div class="exclusion-cat-tabs" id="exclusion-cat-tabs"></div>
+
+      <div class="exclusion-list" id="exclusion-list"></div>
+
+      <div class="exclusion-footer">
+        <span class="exclusion-stat" id="exclusion-stat">已排除 0 / 共 0</span>
+        <button id="exclusion-clear" class="btn-secondary">全部清除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast (for status messages) -->
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
