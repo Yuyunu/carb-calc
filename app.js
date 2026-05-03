@@ -1732,10 +1732,26 @@ const Records = {
   /* ===== Save ===== */
   async saveForm() {
     const name = $('#rf-name').value.trim();
-    if (!name) { showToast('請填餐名', 'warn'); return; }
-    if (!this.formFoods.length) { showToast('至少要選一個食材', 'warn'); return; }
+    if (!name) {
+      showToast('請填餐名', 'warn');
+      $('#rf-name').focus();
+      $('#rf-name').style.borderColor = 'var(--c-red)';
+      setTimeout(() => $('#rf-name').style.borderColor = '', 2000);
+      return;
+    }
+    if (!this.formFoods.length) {
+      showToast('至少選一個食材（點下方「+ 新增食材」）', 'warn', 3500);
+      $('#rf-add-food-btn').focus();
+      $('#rf-add-food-btn').style.outline = '3px solid var(--c-red)';
+      setTimeout(() => $('#rf-add-food-btn').style.outline = '', 2500);
+      return;
+    }
     const dt = $('#rf-datetime').value;
-    if (!dt) { showToast('請選日期時間', 'warn'); return; }
+    if (!dt) {
+      showToast('請選日期時間', 'warn');
+      $('#rf-datetime').focus();
+      return;
+    }
 
     const t = this._calcTotals(this.formFoods);
     const insulin = parseFloat($('#rf-insulin').value) || 0;

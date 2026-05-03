@@ -76,6 +76,16 @@
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* iOS Safari 對 input font-size < 16px 會 auto-zoom 進去然後不易縮回。
+   全域強制 input/textarea/select font-size ≥ 16px（用 !important 蓋掉特定 class 設定）。 */
+input, textarea, select {
+  font-size: 16px !important;
+}
+/* dose-input-row 大字保留更大尺寸 */
+.dose-input-row input {
+  font-size: 22px !important;
+}
 html, body {
   margin: 0;
   padding: 0;
@@ -454,7 +464,7 @@ ul { list-style: none; padding: 0; margin: 0; }
   font-size: 14px;
   font-weight: 500;
   box-shadow: var(--shadow-elev);
-  z-index: 90;
+  z-index: 200;
   animation: toastIn 220ms ease-out;
   max-width: 90vw;
   text-align: center;
@@ -492,7 +502,7 @@ ul { list-style: none; padding: 0; margin: 0; }
   background: var(--bg-card);
   border: 1px solid var(--bd-card);
   border-radius: 12px;
-  font-size: 15px;
+  font-size: 16px;
 }
 #calc-search:focus {
   outline: none;
