@@ -1138,10 +1138,11 @@ const Records = {
     filterMeal: '',
     filterQuery: '',
   },
-  formMode: 'new',     // 'new' | 'edit'
+  formMode: 'new',          // 'new' | 'edit'
+  formInputMode: 'foods',   // 'foods' | 'manual'
   editingId: null,
-  pendingPhoto: null,  // { blob, thumb_b64, phash }
-  formFoods: [],       // [{food, grams}]
+  pendingPhoto: null,       // { blob, thumb_b64, phash }
+  formFoods: [],            // [{food, grams}]
   formCtx: new Set(),
 
   init() {
@@ -1197,6 +1198,17 @@ const Records = {
       $$('#rf-meal-pills .meal-pill').forEach(x => x.classList.toggle('active', x === b));
     });
 
+    // 輸入方式切換
+    $('#rf-mode-pills').addEventListener('click', e => {
+      const b = e.target.closest('.mode-pill');
+      if (!b) return;
+      this._setInputMode(b.dataset.mode);
+    });
+
+    // 手動碳水/GI 輸入
+    $('#rf-manual-carb').addEventListener('input', () => this.updateFormTotals());
+    $('#rf-manual-gi').addEventListener('input', () => this.updateFormTotals());
+
     // 食材 picker
     $('#rf-add-food-btn').addEventListener('click', () => this.openFoodPicker());
     $('#fp-close').addEventListener('click', () => $('#food-picker-modal').classList.add('hidden'));
@@ -1207,7 +1219,7 @@ const Records = {
       const act = b.dataset.doseAct;
       const inp = $('#rf-insulin');
       let v = parseFloat(inp.value) || 0;
-      const delta = { dec5: -0.5, dec1: -0.1, inc1: 0.1, inc5: 0.5 }[act];
+      const delta = { dec1u: -1, dec1: -0.1, inc1: 0.1, inc1u: 1 }[act];
       v = Math.max(0, Math.min(99.9, Math.round((v + delta) * 10) / 10));
       inp.value = v.toFixed(1);
       this.updateFormTotals();
@@ -1344,6 +1356,9 @@ const Records = {
     this.editingId = id;
     this.pendingPhoto = null;
     this.formCtx.clear();
+    this.formInputMode = 'foods';  // 預設食材模式
+    $('#rf-manual-carb').value = '';
+    $('#rf-manual-gi').value = '';
 
     let m = null;
     if (mode === 'edit' && id) {
@@ -1362,16 +1377,25 @@ const Records = {
     $$('#rf-meal-pills .meal-pill').forEach(b =>
       b.classList.toggle('active', b.dataset.meal === meal));
 
-    // 食材
+    // 食材 + 輸入模式
     if (mode === 'edit' && m) {
       this.formFoods = (m.foods || []).map(f => ({
         food: this._lookupFood(f.food_id) || { id: f.food_id, name_zh: f.name_zh, carb_100g: 0, gi: f.gi },
         grams: f.grams,
       }));
+      // 還原 input mode
+      const im = m.input_mode || (m.foods?.length ? 'foods' : 'manual');
+      if (im === 'manual') {
+        $('#rf-manual-carb').value = m.manual_carb_g != null ? m.manual_carb_g : (m.total_carb || '');
+        $('#rf-manual-gi').value = m.manual_gi != null ? m.manual_gi : '';
+      }
+      this._setInputMode(im);
     } else if (prefillFoods) {
       this.formFoods = prefillFoods.map(s => ({ food: s.food, grams: s.grams }));
+      this._setInputMode('foods');
     } else {
       this.formFoods = [];
+      this._setInputMode('foods');
     }
     this._renderFormFoods();
 
@@ -1462,13 +1486,42 @@ const Records = {
   },
 
   updateFormTotals() {
-    const t = this._calcTotals(this.formFoods);
-    $('#rf-t-carb').textContent = `${t.carb.toFixed(1)} g`;
-    $('#rf-t-net').textContent = `${t.netCarb.toFixed(1)} g`;
-    $('#rf-t-gi').textContent = t.gi != null ? t.gi.toFixed(0) : '—';
-    $('#rf-t-gl').textContent = t.gl != null ? t.gl.toFixed(0) : '—';
+    let carb, netCarb, gi, gl;
+    if (this.formInputMode === 'manual') {
+      carb = parseFloat($('#rf-manual-carb').value) || 0;
+      netCarb = carb;  // 沒纖維資料，視為與總碳水同
+      const giIn = parseFloat($('#rf-manual-gi').value);
+      gi = Number.isFinite(giIn) ? giIn : null;
+      gl = (gi != null && carb > 0) ? gi * carb / 100 : null;
+    } else {
+      const t = this._calcTotals(this.formFoods);
+      carb = t.carb; netCarb = t.netCarb; gi = t.gi; gl = t.gl;
+    }
+    $('#rf-t-carb').textContent = `${carb.toFixed(1)} g`;
+    $('#rf-t-net').textContent = `${netCarb.toFixed(1)} g`;
+    $('#rf-t-gi').textContent = gi != null ? gi.toFixed(0) : '—';
+    $('#rf-t-gl').textContent = gl != null ? gl.toFixed(0) : '—';
     const dose = parseFloat($('#rf-insulin').value) || 0;
-    $('#rf-ic-display').textContent = (dose > 0 && t.carb > 0) ? `1:${(t.carb / dose).toFixed(1)}` : '—';
+    $('#rf-ic-display').textContent = (dose > 0 && carb > 0) ? `1:${(carb / dose).toFixed(1)}` : '—';
+  },
+
+  _setInputMode(mode) {
+    this.formInputMode = mode;
+    $$('#rf-mode-pills .mode-pill').forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === mode));
+    $$('.rf-mode-foods').forEach(el => el.classList.toggle('hidden', mode !== 'foods'));
+    $$('.rf-mode-manual').forEach(el => el.classList.toggle('hidden', mode !== 'manual'));
+    // 切到 manual 時若餐名是「自動產生」(食材 compose)，重置成時段名
+    if (mode === 'manual') {
+      const nameSrc = $('#rf-name-source').textContent;
+      if (nameSrc === '🆕' || nameSrc === '✓') {
+        const sug = this.suggestName({ foods: [], meal: this._formMeal(), date: this._formDate() });
+        $('#rf-name').value = sug.name;
+        $('#rf-name-source').textContent = sug.icon;
+        $('#rf-name-source-text').textContent = sug.label;
+      }
+    }
+    this.updateFormTotals();
   },
 
   _calcTotals(foods) {
@@ -1740,13 +1793,28 @@ const Records = {
       setTimeout(() => $('#rf-name').style.borderColor = '', 2000);
       return;
     }
-    if (!this.formFoods.length) {
-      showToast('至少選一個食材（點下方「+ 新增食材」）', 'warn', 3500);
-      $('#rf-add-food-btn').focus();
-      $('#rf-add-food-btn').style.outline = '3px solid var(--c-red)';
-      setTimeout(() => $('#rf-add-food-btn').style.outline = '', 2500);
-      return;
+
+    // 依 input mode 驗證
+    const isManual = this.formInputMode === 'manual';
+    if (isManual) {
+      const mc = parseFloat($('#rf-manual-carb').value);
+      if (!Number.isFinite(mc) || mc <= 0) {
+        showToast('請填總碳水量（g）', 'warn', 3500);
+        $('#rf-manual-carb').focus();
+        $('#rf-manual-carb').style.borderColor = 'var(--c-red)';
+        setTimeout(() => $('#rf-manual-carb').style.borderColor = '', 2500);
+        return;
+      }
+    } else {
+      if (!this.formFoods.length) {
+        showToast('至少選一個食材（或切到「✏ 手動輸入碳水」）', 'warn', 3500);
+        $('#rf-add-food-btn').focus();
+        $('#rf-add-food-btn').style.outline = '3px solid var(--c-red)';
+        setTimeout(() => $('#rf-add-food-btn').style.outline = '', 2500);
+        return;
+      }
     }
+
     const dt = $('#rf-datetime').value;
     if (!dt) {
       showToast('請選日期時間', 'warn');
@@ -1754,7 +1822,21 @@ const Records = {
       return;
     }
 
-    const t = this._calcTotals(this.formFoods);
+    // 計算總計（依 mode）
+    let t;
+    if (isManual) {
+      const mc = parseFloat($('#rf-manual-carb').value) || 0;
+      const mgi = parseFloat($('#rf-manual-gi').value);
+      const giVal = Number.isFinite(mgi) ? mgi : null;
+      t = {
+        kcal: 0, carb: mc, fiber: 0, netCarb: mc,
+        protein: 0, fat: 0,
+        gi: giVal,
+        gl: (giVal != null) ? giVal * mc / 100 : null,
+      };
+    } else {
+      t = this._calcTotals(this.formFoods);
+    }
     const insulin = parseFloat($('#rf-insulin').value) || 0;
     const meal = this._formMeal();
 
@@ -1780,7 +1862,10 @@ const Records = {
       date: dt,
       meal,
       name,
-      foods: this.formFoods.map(s => ({
+      input_mode: isManual ? 'manual' : 'foods',
+      manual_carb_g: isManual ? +t.carb.toFixed(1) : null,
+      manual_gi: isManual ? t.gi : null,
+      foods: isManual ? [] : this.formFoods.map(s => ({
         food_id: s.food.id,
         name_zh: s.food.name_zh,
         grams: s.grams,
@@ -1874,7 +1959,15 @@ const Records = {
     const photoEl = m.photo?.url ? `<img class="rd-photo" src="${m.photo.url}" alt="">` :
                     m.photo?.thumb_b64 ? `<img class="rd-photo" src="${m.photo.thumb_b64}" alt="">` : '';
 
-    const foodsHtml = (m.foods || []).map(f => `
+    const isManual = (m.input_mode === 'manual') || (!m.foods?.length);
+    const foodsHtml = isManual
+      ? `<div class="sel-row" style="background:var(--bg-page);">
+           <div class="sel-info">
+             <div class="sel-name">✏ 手動輸入碳水</div>
+             <div class="sel-meta">總碳水 ${(+m.total_carb).toFixed(1)}g${m.weighted_gi ? ` · GI ${m.weighted_gi}` : ''}（無食材組成）</div>
+           </div>
+         </div>`
+      : (m.foods || []).map(f => `
       <div class="sel-row">
         <div class="sel-info">
           <div class="sel-name">${escapeHtml(f.name_zh)}</div>

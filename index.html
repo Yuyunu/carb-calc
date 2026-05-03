@@ -469,8 +469,17 @@
           </div>
         </div>
 
-        <!-- 食材 -->
+        <!-- 輸入模式切換 -->
         <div class="rf-section">
+          <label class="rf-label">輸入方式</label>
+          <div class="input-mode-pills" id="rf-mode-pills">
+            <button class="mode-pill active" data-mode="foods">🥗 選食材</button>
+            <button class="mode-pill" data-mode="manual">✏ 手動輸入碳水</button>
+          </div>
+        </div>
+
+        <!-- 食材模式 -->
+        <div class="rf-section rf-mode-foods">
           <label class="rf-label">食材</label>
           <div id="rf-foods-list" class="rf-foods-list">
             <p class="empty-hint muted">尚未選食材，可從計算器頁帶入或這邊新增。</p>
@@ -478,23 +487,39 @@
           <button class="btn-secondary" id="rf-add-food-btn">+ 新增食材</button>
         </div>
 
-        <!-- 即時總計 -->
-        <div class="rf-totals" id="rf-totals">
+        <!-- 食材模式即時總計 -->
+        <div class="rf-totals rf-mode-foods" id="rf-totals">
           <span><span class="muted">碳水</span> <strong id="rf-t-carb">0 g</strong></span>
           <span><span class="muted">淨碳水</span> <strong id="rf-t-net">0 g</strong></span>
           <span><span class="muted">GI</span> <strong id="rf-t-gi">—</strong></span>
           <span><span class="muted">GL</span> <strong id="rf-t-gl">—</strong></span>
         </div>
 
+        <!-- 手動輸入模式 -->
+        <div class="rf-section rf-mode-manual hidden">
+          <label class="rf-label">手動輸入碳水（沒做 carb count 時用這個）</label>
+          <div class="manual-input-grid">
+            <label>
+              <span class="muted small">總碳水 (g) *</span>
+              <input type="number" id="rf-manual-carb" min="0" max="500" step="1" inputmode="numeric" placeholder="80">
+            </label>
+            <label>
+              <span class="muted small">GI（可選）</span>
+              <input type="number" id="rf-manual-gi" min="0" max="120" step="1" inputmode="numeric" placeholder="留空">
+            </label>
+          </div>
+          <p class="hint">沒選食材直接記碳水量。建議劑量 + I:C 演算法照算，可進「常吃餐記憶」累積。</p>
+        </div>
+
         <!-- 胰島素 -->
         <div class="rf-section">
           <label class="rf-label">胰島素劑量</label>
           <div class="dose-input-row">
-            <button class="gram-btn" data-dose-act="dec5">−.5</button>
-            <button class="gram-btn" data-dose-act="dec1">−.1</button>
+            <button class="dose-btn dose-btn-big" data-dose-act="dec1u">−1</button>
+            <button class="dose-btn" data-dose-act="dec1">−.1</button>
             <input type="number" id="rf-insulin" step="0.1" min="0" max="99.9" inputmode="decimal" placeholder="0.0">
-            <button class="gram-btn" data-dose-act="inc1">+.1</button>
-            <button class="gram-btn" data-dose-act="inc5">+.5</button>
+            <button class="dose-btn" data-dose-act="inc1">+.1</button>
+            <button class="dose-btn dose-btn-big" data-dose-act="inc1u">+1</button>
             <span class="gram-unit">U</span>
           </div>
           <p class="rf-ic-line muted small">I:C = <span id="rf-ic-display">—</span></p>

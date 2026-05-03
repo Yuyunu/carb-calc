@@ -799,7 +799,8 @@ ul { list-style: none; padding: 0; margin: 0; }
   font-weight: 600;
   margin-bottom: 6px;
 }
-.dose-meal { background: rgba(61, 41, 20, 0.15); padding: 4px 10px; border-radius: 999px; }
+.dose-meal { background: rgba(61, 41, 20, 0.15); padding: 4px 10px; border-radius: 999px; color: var(--c-dark-brown); font-weight: 700; }
+.dose-card .muted { color: rgba(42, 26, 12, 0.7) !important; }
 .dose-value-row {
   display: flex;
   align-items: baseline;
@@ -1110,6 +1111,42 @@ ul { list-style: none; padding: 0; margin: 0; }
   color: var(--c-text-muted);
 }
 
+/* 輸入方式 pills */
+.input-mode-pills {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-page);
+  border: 1px solid var(--bd-card);
+  border-radius: 10px;
+  padding: 3px;
+}
+.mode-pill {
+  flex: 1;
+  padding: 9px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--c-text-muted);
+  font-weight: 600;
+  transition: all var(--transition);
+}
+.mode-pill.active {
+  background: var(--c-yellow);
+  color: var(--c-dark-brown);
+}
+.manual-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.manual-input-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* 餐別 pills */
 .meal-pills {
   display: flex;
@@ -1167,21 +1204,31 @@ ul { list-style: none; padding: 0; margin: 0; }
 .rf-foods-list .sel-row { padding: 8px 10px; }
 .rf-foods-list .empty-hint { padding: 14px; }
 
-/* 即時總計 */
+/* 即時總計（黃底高對比版） */
 .rf-totals {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
   background: var(--c-yellow);
   color: var(--c-dark-brown);
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 10px;
   margin-bottom: 16px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  border: 1px solid #C49000;
 }
-.rf-totals strong { font-size: 15px; }
-[data-theme="dark"] .rf-totals { background: var(--c-yellow-warm); }
+.rf-totals strong {
+  font-size: 17px;
+  font-weight: 800;
+  color: #2A1A0C;  /* 比 --c-dark-brown (#3D2914) 更深，對比更強 */
+}
+.rf-totals .muted {
+  color: rgba(42, 26, 12, 0.7) !important;  /* 蓋掉全域 --c-text-muted */
+  font-weight: 600;
+}
+[data-theme="dark"] .rf-totals { background: var(--c-yellow-warm); border-color: #B07700; }
 
 /* Dose 輸入 row */
 .dose-input-row {
@@ -1203,7 +1250,39 @@ ul { list-style: none; padding: 0; margin: 0; }
   padding: 4px !important;
   font-variant-numeric: tabular-nums;
 }
+/* 劑量按鈕（深棕底+黃字高對比）*/
+.dose-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--c-dark-brown);
+  color: var(--c-yellow);
+  font-weight: 800;
+  font-size: 13px;
+  display: grid; place-items: center;
+  border: none;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: transform var(--transition), background var(--transition);
+}
+.dose-btn:hover { background: #4F361B; }
+.dose-btn:active { transform: scale(0.92); }
+.dose-btn.dose-btn-big {
+  font-size: 14px;
+  background: var(--c-yellow);
+  color: var(--c-dark-brown);
+  border: 2px solid var(--c-dark-brown);
+}
+.dose-btn.dose-btn-big:hover { background: var(--c-yellow-warm); }
 .dose-input-row .gram-btn { width: 32px; height: 32px; font-size: 12px; }
+
+/* gram-btn 整體對比強化（已選食材 +/-/g/✕）*/
+.gram-btn {
+  background: var(--c-dark-brown);
+  color: var(--c-yellow);
+  font-weight: 800;
+}
+.gram-btn:hover { background: #4F361B; }
 .rf-ic-line { margin: 6px 0 0; font-size: 13px; }
 .rf-bolus-line { margin: 4px 0 0; font-size: 11px; }
 
