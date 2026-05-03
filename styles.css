@@ -592,6 +592,9 @@ ul { list-style: none; padding: 0; margin: 0; }
 .chip[data-cat="點心"]      { border-color: var(--c-orange); }
 .chip[data-cat="便當/加工"] { border-color: var(--c-red); }
 .chip[data-cat="飲料"]      { border-color: var(--c-yellow); }
+.chip[data-cat="速食"]      { border-color: var(--c-red); border-style: dashed; }
+.chip[data-cat="早午餐"]    { border-color: var(--c-orange); border-style: dashed; }
+.chip[data-cat="日式料理"]  { border-color: var(--c-red); border-style: dotted; border-width: 2px; }
 .chip[data-cat="蔬菜"]      { border-color: var(--c-dark-brown); }
 .chip[data-cat="加工"]      { border-color: var(--c-dark-brown); }
 .chip[data-cat="油脂"]      { border-color: var(--c-dark-brown); }

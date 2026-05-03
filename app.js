@@ -334,7 +334,7 @@ python3 -m http.server 8000</pre>
 const Calc = {
   db: null,
   // 顯示用分類（按使用頻率排序，與 food-db category 對映）
-  categories: ['主食', '蔬菜', '蛋白質', '水果', '飲料', '點心', '便當/加工', '加工', '油脂', '調味', '其他'],
+  categories: ['主食', '蔬菜', '蛋白質', '水果', '飲料', '點心', '速食', '早午餐', '日式料理', '便當/加工', '加工', '油脂', '調味', '其他'],
   state: {
     cat: '主食',
     filter: 'common',     // 'common' | 'all'
