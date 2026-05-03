@@ -415,7 +415,10 @@ ul { list-style: none; padding: 0; margin: 0; }
   display: grid;
   place-items: center;
   z-index: 100;
-  padding: 16px;
+  /* iOS notch / 動態島 / Home Indicator 安全區 */
+  padding: max(16px, env(safe-area-inset-top, 16px))
+           16px
+           max(16px, env(safe-area-inset-bottom, 16px));
   animation: fadeIn 200ms ease-out;
 }
 .modal.hidden { display: none; }
@@ -1037,7 +1040,7 @@ ul { list-style: none; padding: 0; margin: 0; }
 .record-detail-card {
   width: 100%;
   max-width: 560px;
-  max-height: 95vh;
+  max-height: 100%;  /* 配合 .modal 的 safe-area padding */
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -1574,7 +1577,7 @@ ul { list-style: none; padding: 0; margin: 0; }
 .exclusion-modal-card {
   max-width: 560px;
   width: 100%;
-  max-height: 90vh;
+  max-height: 100%;  /* 配合 .modal 的 safe-area padding */
   display: flex;
   flex-direction: column;
   padding: 16px;
