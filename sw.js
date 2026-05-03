@@ -5,7 +5,7 @@
    - 其他：network-first，失敗回 cache
    ============================================================= */
 
-const CACHE_VERSION = 'cc-v0.2.0';
+const CACHE_VERSION = 'cc-v0.2.1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -20,6 +20,8 @@ const STATIC_ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable.png',
+  './icons/apple-touch-icon.png',
+  './favicon.ico',
 ];
 
 self.addEventListener('install', event => {
