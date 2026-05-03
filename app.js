@@ -294,6 +294,7 @@ function onFoodDbLoaded(db) {
   Records.init();
   Trends.init();
   Sync.init();
+  Reminder.init();
 }
 
 function showFoodDbError() {
@@ -1816,7 +1817,14 @@ const Records = {
     this.closeForm();
     this.renderList();
     this.updateFreqMealsCount();
-    showToast(this.formMode === 'edit' ? '已更新紀錄' : '已新增紀錄', 'success');
+
+    // 排 1h/2h BG 提醒（如果新建 + 缺 2h BG + 設定有開）
+    const isNew = this.formMode !== 'edit';
+    if (isNew && (meal_obj.bg_2h == null) && Reminder.enabled()) {
+      Reminder.scheduleAfterSave(meal_obj);
+    } else {
+      showToast(this.formMode === 'edit' ? '已更新紀錄' : '已新增紀錄', 'success');
+    }
 
     // 觸發 Cloudinary 上傳（背景）
     if (this.pendingPhoto && photo?.upload_pending) {
@@ -2116,6 +2124,186 @@ const Records = {
   trendData(days = 30) {
     const cutoff = Date.now() - days * 86400000;
     return this.meals.filter(m => new Date(m.date).getTime() >= cutoff);
+  },
+};
+
+/* =============================================================
+   Reminder — 餐後 BG 提醒（Web Notification + iCal）
+   ============================================================= */
+const Reminder = {
+  pendingTimers: {},  // { 'meal_id-1h': timeoutId }
+
+  init() {
+    const toggle = $('#set-reminder-on');
+    if (toggle) {
+      toggle.checked = lsGet('cc_reminder_on', '0') === '1';
+      toggle.addEventListener('change', () => {
+        lsSet('cc_reminder_on', toggle.checked ? '1' : '0');
+        if (toggle.checked && 'Notification' in window && Notification.permission === 'default') {
+          this.requestPermission();
+        }
+      });
+    }
+    const permBtn = $('#reminder-permission');
+    if (permBtn) permBtn.addEventListener('click', () => this.requestPermission());
+    const testBtn = $('#test-notification');
+    if (testBtn) testBtn.addEventListener('click', () => this.testNotification());
+    this._renderPermStatus();
+  },
+
+  enabled() { return lsGet('cc_reminder_on', '0') === '1'; },
+
+  _renderPermStatus() {
+    const el = $('#reminder-perm-status');
+    if (!el) return;
+    if (!('Notification' in window)) {
+      el.textContent = '✕ 此瀏覽器不支援 Web 通知';
+      el.className = 'status-line danger';
+      return;
+    }
+    const p = Notification.permission;
+    if (p === 'granted') {
+      el.textContent = '✓ 已允許 Web 通知（PWA 開著時可跳）';
+      el.className = 'status-line success';
+    } else if (p === 'denied') {
+      el.textContent = '✕ 已拒絕。Safari → 設定 → 網站 → yuyunu.github.io 解除';
+      el.className = 'status-line danger';
+    } else {
+      el.textContent = '尚未授權，按「允許通知」';
+      el.className = 'status-line muted';
+    }
+  },
+
+  async requestPermission() {
+    if (!('Notification' in window)) return showToast('此瀏覽器不支援通知', 'error');
+    const r = await Notification.requestPermission();
+    this._renderPermStatus();
+    if (r === 'granted') showToast('已允許通知', 'success');
+    else showToast('未允許通知', 'warn');
+  },
+
+  testNotification() {
+    if (!('Notification' in window)) return showToast('不支援', 'error');
+    if (Notification.permission !== 'granted') return showToast('請先允許通知', 'warn');
+    new Notification('🩸 carb-calc 測試通知', {
+      body: 'Web 通知運作正常。實際 1h/2h 提醒會在妳存紀錄後自動排程。',
+      icon: 'icons/icon-192.png',
+    });
+  },
+
+  /** 存完餐後呼叫：排 setTimeout + 給 .ics 下載按鈕 */
+  scheduleAfterSave(meal) {
+    if (!this.enabled()) return;
+
+    // 1. 排 setTimeout（PWA 開著時會跳）
+    const now = Date.now();
+    const mealTime = new Date(meal.date).getTime();
+    const ms1h = mealTime + 60 * 60 * 1000 - now;
+    const ms2h = mealTime + 120 * 60 * 1000 - now;
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      if (ms1h > 0) {
+        const t1 = setTimeout(() => {
+          new Notification(`🩸 量 BG（餐後 1h）`, {
+            body: meal.name,
+            icon: 'icons/icon-192.png',
+            tag: `bg-1h-${meal.id}`,
+            requireInteraction: false,
+          });
+        }, ms1h);
+        this.pendingTimers[meal.id + '-1h'] = t1;
+      }
+      if (ms2h > 0) {
+        const t2 = setTimeout(() => {
+          new Notification(`🩸 量 BG（餐後 2h）`, {
+            body: meal.name,
+            icon: 'icons/icon-192.png',
+            tag: `bg-2h-${meal.id}`,
+            requireInteraction: false,
+          });
+        }, ms2h);
+        this.pendingTimers[meal.id + '-2h'] = t2;
+      }
+    }
+
+    // 2. 提供 .ics 下載連結 toast（最可靠：iPhone 行事曆即使 PWA 關了也會跳）
+    if (ms2h <= 0) return;  // 兩個時間都過了
+    this._showICSToast(meal);
+  },
+
+  _showICSToast(meal) {
+    const t = $('#toast');
+    t.innerHTML = `已存紀錄 · 1h/2h 提醒已排 <button id="dl-ics" style="margin-left:8px;padding:4px 10px;border-radius:6px;background:white;color:var(--c-dark-brown);font-weight:700;border:none;font-size:13px;">📅 加到行事曆</button>`;
+    t.className = 'toast success';
+    t.classList.remove('hidden');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => t.classList.add('hidden'), 8000);
+    document.getElementById('dl-ics').addEventListener('click', e => {
+      e.stopPropagation();
+      this.downloadICS(meal);
+      t.classList.add('hidden');
+    });
+  },
+
+  /** 產生 .ics 並觸發下載；iPhone Safari 點下載會跳行事曆「加入」 prompt */
+  downloadICS(meal) {
+    const start1h = new Date(meal.date);
+    start1h.setHours(start1h.getHours() + 1);
+    const end1h = new Date(start1h.getTime() + 5 * 60000);
+    const start2h = new Date(meal.date);
+    start2h.setHours(start2h.getHours() + 2);
+    const end2h = new Date(start2h.getTime() + 5 * 60000);
+    const fmt = d => d.toISOString().replace(/[-:]|\.\d{3}/g, '');
+    const stamp = fmt(new Date());
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//carb-calc//meal-reminder//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:meal-1h-${meal.id}@carb-calc`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART:${fmt(start1h)}`,
+      `DTEND:${fmt(end1h)}`,
+      `SUMMARY:🩸 量 BG (餐後 1h) — ${this._escIcs(meal.name)}`,
+      `DESCRIPTION:來自 carb-calc：請量血糖並回填紀錄`,
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      'TRIGGER:-PT0M',
+      'DESCRIPTION:量 BG (1h)',
+      'END:VALARM',
+      'END:VEVENT',
+      'BEGIN:VEVENT',
+      `UID:meal-2h-${meal.id}@carb-calc`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART:${fmt(start2h)}`,
+      `DTEND:${fmt(end2h)}`,
+      `SUMMARY:🩸 量 BG (餐後 2h) — ${this._escIcs(meal.name)}`,
+      `DESCRIPTION:來自 carb-calc：請量血糖並回填紀錄`,
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      'TRIGGER:-PT0M',
+      'DESCRIPTION:量 BG (2h)',
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bg-reminder-${meal.id}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 200);
+    showToast('已下載行事曆檔，請點開讓 iPhone 加入提醒', 'success', 4500);
+  },
+
+  _escIcs(s) {
+    return String(s).replace(/[\\,;]/g, x => '\\' + x).replace(/\n/g, '\\n');
   },
 };
 
