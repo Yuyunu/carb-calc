@@ -475,6 +475,9 @@ const Calc = {
   },
 
   _defaultGrams(food) {
+    // 品牌餐飲有實際份量 → 預設帶整份（而非 100g）
+    if (food.serving_g)  return Math.round(food.serving_g);
+    if (food.serving_ml) return Math.round(food.serving_ml);
     const c = food.category;
     if (c === '主食') return 150;
     if (c === '蔬菜') return 80;
@@ -712,6 +715,16 @@ const Calc = {
     $('#fm-fat').textContent     = fmt(f.fat_100g);
     $('#fm-sodium').textContent  = f.sodium_100g_mg != null ? `${(+f.sodium_100g_mg).toFixed(0)} mg` : '—';
     $('#fm-water').textContent   = fmt(f.water_100g);
+    // 份量提示（品牌餐飲：一份等於幾克／幾 ml）
+    const servEl = $('#fm-serving');
+    const sv = f.serving_g || f.serving_ml;
+    if (sv) {
+      const mult = sv / 100;
+      servEl.textContent = `🍽 ${f.serving_desc || ('整份約 ' + sv + 'g')}　·　整份營養 ≈ 上方數值 × ${mult.toFixed(2)}`;
+      servEl.classList.remove('hidden');
+    } else {
+      servEl.classList.add('hidden');
+    }
     $('#fm-gi').textContent      = eff != null ? eff : '—';
     const conf = $('#fm-gi-conf');
     if (f.gi_confirmed) {
