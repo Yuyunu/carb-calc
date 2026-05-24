@@ -846,9 +846,10 @@ ul { list-style: none; padding: 0; margin: 0; }
 .modal-close {
   position: absolute;
   top: 10px; right: 10px;
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  font-size: 16px;
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  font-size: 22px;
+  line-height: 1;
   color: var(--c-text-muted);
 }
 .modal-close:hover { background: var(--bd-card); color: var(--c-text); }
@@ -1585,12 +1586,14 @@ ul { list-style: none; padding: 0; margin: 0; }
   flex-direction: column;
   padding: 16px;
   overflow: hidden;
+  position: relative;  /* 讓 .modal-close 對齊卡片右上角 */
 }
 .exclusion-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
+  flex-shrink: 0;
 }
 .exclusion-header h2 {
   font-size: 18px;
@@ -1598,6 +1601,7 @@ ul { list-style: none; padding: 0; margin: 0; }
 }
 .exclusion-search-bar {
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .exclusion-search-bar input {
   width: 100%;
@@ -1618,6 +1622,7 @@ ul { list-style: none; padding: 0; margin: 0; }
   overflow-x: auto;
   padding: 4px 0 8px;
   scrollbar-width: none;
+  flex-shrink: 0;
 }
 .exclusion-cat-tabs::-webkit-scrollbar { display: none; }
 .exclusion-cat-tabs .cat-tab {
