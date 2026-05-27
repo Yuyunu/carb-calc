@@ -1212,6 +1212,13 @@ const Records = {
       $$('#rf-meal-pills .meal-pill').forEach(x => x.classList.toggle('active', x === b));
     });
 
+    // 碳水信心 pills
+    $('#rf-conf-pills').addEventListener('click', e => {
+      const b = e.target.closest('.conf-pill');
+      if (!b) return;
+      $$('#rf-conf-pills .conf-pill').forEach(x => x.classList.toggle('active', x === b));
+    });
+
     // 輸入方式切換
     $('#rf-mode-pills').addEventListener('click', e => {
       const b = e.target.closest('.mode-pill');
@@ -1390,6 +1397,11 @@ const Records = {
     const meal = m ? m.meal : this._inferMeal(now);
     $$('#rf-meal-pills .meal-pill').forEach(b =>
       b.classList.toggle('active', b.dataset.meal === meal));
+
+    // 碳水信心(預設精確)
+    const conf = (m && m.carb_confidence) || 'exact';
+    $$('#rf-conf-pills .conf-pill').forEach(b =>
+      b.classList.toggle('active', b.dataset.conf === conf));
 
     // 食材 + 輸入模式
     if (mode === 'edit' && m) {
@@ -1793,6 +1805,10 @@ const Records = {
     const active = document.querySelector('#rf-meal-pills .meal-pill.active');
     return active ? active.dataset.meal : 'lunch';
   },
+  _formCarbConf() {
+    const active = document.querySelector('#rf-conf-pills .conf-pill.active');
+    return active ? active.dataset.conf : 'exact';
+  },
   _formDate() {
     const v = $('#rf-datetime').value;
     return v ? new Date(v) : new Date();
@@ -1877,6 +1893,7 @@ const Records = {
       date: dt,
       meal,
       name,
+      carb_confidence: this._formCarbConf(),
       input_mode: isManual ? 'manual' : 'foods',
       manual_carb_g: isManual ? +t.carb.toFixed(1) : null,
       manual_gi: isManual ? t.gi : null,
@@ -1994,13 +2011,17 @@ const Records = {
     const histHtml = this._renderHistory(m);
     const suggestHtml = this._renderSuggest(m);
 
+    const confKey = m.carb_confidence || 'exact';
+    const confText = { exact: '精確', estimate: '估算', guess: '猜的' }[confKey] || '精確';
+    const confBadge = `<span class="conf-badge conf-${confKey}">${confText}</span>`;
+
     body.innerHTML = `
       ${photoEl}
       ${suggestHtml}
       <div class="rd-info-grid">
         <div class="rd-cell"><div class="lbl">日期時間</div><div class="val">${(m.date || '').replace('T', ' ')}</div></div>
         <div class="rd-cell"><div class="lbl">餐別</div><div class="val">${this._mealEmoji(m.meal)} ${({breakfast:'早餐',lunch:'午餐',dinner:'晚餐',late:'宵夜'})[m.meal]||''}</div></div>
-        <div class="rd-cell"><div class="lbl">總碳水</div><div class="val">${(+m.total_carb).toFixed(1)} g</div></div>
+        <div class="rd-cell"><div class="lbl">總碳水</div><div class="val">${(+m.total_carb).toFixed(1)} g${confBadge}</div></div>
         <div class="rd-cell"><div class="lbl">淨碳水</div><div class="val">${(+m.total_net_carb).toFixed(1)} g</div></div>
         <div class="rd-cell"><div class="lbl">胰島素</div><div class="val">${(+m.insulin_u).toFixed(1)} U</div></div>
         <div class="rd-cell"><div class="lbl">I:C</div><div class="val">${m.ic_ratio != null ? '1:'+(+m.ic_ratio).toFixed(1) : '—'}</div></div>
@@ -2034,10 +2055,17 @@ const Records = {
   _renderSuggest(m) {
     const s = this.suggestDoseAdjust(m.name);
     if (s.kind === 'insufficient') {
+      if ((s.n_total || 0) === 0) return '';
+      if (s.n === 0 && s.n_excluded > 0) {
+        return `<div class="suggest-card insufficient">
+          <div class="suggest-title">📊 同餐 ${s.n_total} 筆紀錄,但全是「猜的」</div>
+          <p class="muted small">「猜的」紀錄不會列入演算法,避免帶歪 I:C 學習。新增「精確」或「估算」紀錄後就會開始學。</p>
+        </div>`;
+      }
       const need = 3 - s.n;
-      if (s.n === 0) return '';
+      const exclLabel = s.n_excluded ? `(另 ${s.n_excluded} 筆「猜的」未列入)` : '';
       return `<div class="suggest-card insufficient">
-        <div class="suggest-title">📊 同餐 ${s.n} 筆紀錄${s.reason==='no-bg'?'（沒 BG）':''}</div>
+        <div class="suggest-title">📊 同餐 ${s.n} 筆${exclLabel}${s.reason==='no-bg'?'(沒 BG)':''}</div>
         <p class="muted small">需要 ${need} 筆才能給建議劑量。先記錄後，演算法會自動學妳對這道菜的反應。</p>
       </div>`;
     }
@@ -2046,17 +2074,22 @@ const Records = {
     const peakKind = s.avgPeak > 250 ? 'danger' : s.avgPeak > 180 ? 'warn' : s.avgPeak < 70 ? 'danger' : s.avgPeak < 80 ? 'warn' : 'good';
     const confLabel = ({low:'低',medium:'中',high:'高'})[s.confidence];
     const deltaStr = s.delta === 0 ? '' : (s.delta > 0 ? '+' : '') + s.delta.toFixed(1);
+    const estTag = s.n_estimate ? `(其中 ${s.n_estimate} 估算)` : '';
+    const exclTag = s.n_excluded ? `(排除 ${s.n_excluded} 筆「猜的」)` : '';
+    const icDisplay = s.avgIc != null
+      ? `1:${s.avgIc.toFixed(1)}<span class="muted small">(精確 ${s.n_ic} 筆)</span>`
+      : `1:—<span class="muted small">(沒精確紀錄,無法算 I:C)</span>`;
     return `<div class="suggest-card ${s.direction}">
       <div class="suggest-title">💡 下次建議劑量</div>
       <div class="suggest-main">
         <div class="suggest-dose">${s.suggestedDose.toFixed(1)} <small>U</small></div>
         <div class="suggest-meta">
           <div>${dirIcon} ${dirText}${deltaStr ? `（上次 ${s.lastDose.toFixed(1)}U ${deltaStr}）` : ''}</div>
-          <div class="muted small">同餐 ${s.n} 筆 · 平均 1:${s.avgIc?.toFixed(1) ?? '—'} · 平均餐後峰值 <span class="bg-${peakKind}">${s.avgPeak} mg/dL</span></div>
+          <div class="muted small">同餐 ${s.n} 筆${estTag}${exclTag} · 平均 ${icDisplay} · 平均餐後峰值 <span class="bg-${peakKind}">${s.avgPeak} mg/dL</span></div>
         </div>
       </div>
       <p class="suggest-conf small ${s.confidence}">信心：${confLabel}（${s.n} 筆紀錄${s.n>=7?'，已穩定':s.n>=3?'，初步':'，樣本少'}）</p>
-      <p class="suggest-disclaimer">⚠ 統計輔助，最終劑量請與醫師確認。</p>
+      <p class="suggest-disclaimer">⚠ 統計輔助,最終劑量請與醫師確認。估算紀錄的 BG 趨勢仍納入,但 I:C 平均只取精確紀錄。</p>
     </div>`;
   },
 
@@ -2172,11 +2205,14 @@ const Records = {
    *   ≥7: ±0.5U
    */
   suggestDoseAdjust(mealName) {
-    const history = this.meals
+    const all = this.meals
       .filter(m => m.name === mealName && m.insulin_u > 0)
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    // 「猜的」碳水太不準,完全排除於演算法
+    const history = all.filter(m => (m.carb_confidence || 'exact') !== 'guess');
+    const n_excluded = all.length - history.length;
     if (history.length < 3) {
-      return { kind: 'insufficient', n: history.length };
+      return { kind: 'insufficient', n: history.length, n_total: all.length, n_excluded };
     }
 
     const recent = history.slice(0, 7);
@@ -2184,10 +2220,14 @@ const Records = {
       .map(m => Math.max(m.bg_1h || 0, m.bg_2h || 0))
       .filter(p => p > 0);
     if (!peaks.length) {
-      return { kind: 'insufficient', n: history.length, reason: 'no-bg' };
+      return { kind: 'insufficient', n: history.length, n_total: all.length, n_excluded, reason: 'no-bg' };
     }
     const avgPeak = peaks.reduce((a, b) => a + b, 0) / peaks.length;
-    const icArr = recent.filter(m => m.ic_ratio).map(m => m.ic_ratio);
+    // I:C 平均只用「精確」紀錄(estimate 的碳水不準,IC 不可信);
+    // 但 estimate 仍計入樣本數與 BG 趨勢(BG 是實測,可信)
+    const exactRecent = recent.filter(m => (m.carb_confidence || 'exact') === 'exact');
+    const n_estimate = recent.length - exactRecent.length;
+    const icArr = exactRecent.filter(m => m.ic_ratio).map(m => m.ic_ratio);
     const avgIc = icArr.length ? icArr.reduce((a, b) => a + b, 0) / icArr.length : null;
 
     let direction = 'maintain';
@@ -2218,6 +2258,10 @@ const Records = {
     return {
       kind: 'suggest',
       n: N,
+      n_total: all.length,
+      n_excluded,
+      n_estimate,
+      n_ic: icArr.length,
       n_with_bg: peaks.length,
       avgPeak: Math.round(avgPeak),
       avgIc: avgIc != null ? +avgIc.toFixed(1) : null,

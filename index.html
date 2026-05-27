@@ -524,6 +524,17 @@
           <p class="hint">沒選食材直接記碳水量。建議劑量 + I:C 演算法照算，可進「常吃餐記憶」累積。</p>
         </div>
 
+        <!-- 碳水信心(影響建議劑量演算法) -->
+        <div class="rf-section">
+          <label class="rf-label">碳水信心</label>
+          <div class="conf-pills" id="rf-conf-pills" role="radiogroup">
+            <button class="conf-pill active" type="button" data-conf="exact">✓ 精確</button>
+            <button class="conf-pill" type="button" data-conf="estimate">~ 估算</button>
+            <button class="conf-pill" type="button" data-conf="guess">? 猜的</button>
+          </div>
+          <p class="hint">「猜的」不會列入建議劑量演算法,避免不準的碳水帶歪學習(仍會存紀錄)。</p>
+        </div>
+
         <!-- 胰島素 -->
         <div class="rf-section">
           <label class="rf-label">胰島素劑量</label>
