@@ -53,6 +53,15 @@
     <!-- Tab 1 — 計算器 -->
     <section id="tab-calculator" class="tab-panel active" role="tabpanel" aria-labelledby="nav-calculator">
 
+      <!-- 釘住的餐點(快速建立) -->
+      <div class="pinned-meals-section hidden" id="pinned-meals-section">
+        <div class="pinned-meals-header">
+          <span class="pinned-meals-title">📌 我的餐點</span>
+          <span class="pinned-meals-hint muted small">點一下快速建立</span>
+        </div>
+        <div class="pinned-list" id="pinned-list"></div>
+      </div>
+
       <!-- 搜尋 + 顯示切換 -->
       <div class="calc-search-bar">
         <input type="search" id="calc-search" placeholder="🔍 搜尋食材（中/英）" autocomplete="off">
@@ -432,7 +441,10 @@
         <div class="rf-section">
           <label class="rf-label">餐名</label>
           <input type="text" id="rf-name" placeholder="例：午餐 0502">
-          <p class="rf-name-hint" id="rf-name-hint"><span id="rf-name-source">🆕</span> <span id="rf-name-source-text">建議名，可改</span></p>
+          <div class="rf-name-row">
+            <p class="rf-name-hint" id="rf-name-hint"><span id="rf-name-source">🆕</span> <span id="rf-name-source-text">建議名，可改</span></p>
+            <button type="button" class="rf-pin-btn" id="rf-pin-btn" disabled>📌 釘到首頁</button>
+          </div>
         </div>
 
         <!-- 日期時間 + 餐別 -->

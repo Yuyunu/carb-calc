@@ -1773,6 +1773,119 @@ ul { list-style: none; padding: 0; margin: 0; }
   .app-header, .tab-bar { display: none; }
 }
 
+/* =============================================================
+   📌 釘住的餐點(首頁快速建立 + 紀錄表單釘選按鈕)
+   ============================================================= */
+
+.pinned-meals-section {
+  background: var(--bg-card);
+  border: 1px solid var(--bd-card);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.pinned-meals-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pinned-meals-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--c-dark-brown);
+}
+
+.pinned-meals-hint {
+  font-size: 11.5px;
+}
+
+.pinned-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pinned-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 10px 7px 12px;
+  background: var(--c-yellow);
+  border: 1.5px solid var(--c-yellow);
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-dark-brown);
+  transition: all var(--transition);
+  cursor: pointer;
+}
+
+.pinned-pill:hover { background: var(--c-yellow-warm); }
+
+.pinned-pill .pinned-pill-name {
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pinned-pill .pinned-pill-remove {
+  background: rgba(61, 41, 20, 0.15);
+  border: none;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--c-dark-brown);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pinned-pill .pinned-pill-remove:hover {
+  background: rgba(61, 41, 20, 0.3);
+}
+
+/* 紀錄表單裡的釘選按鈕 */
+.rf-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.rf-pin-btn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--bd-card);
+  border-radius: 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-text-secondary);
+  transition: all var(--transition);
+  cursor: pointer;
+}
+
+.rf-pin-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rf-pin-btn.pinned {
+  background: var(--c-yellow);
+  border-color: var(--c-yellow);
+  color: var(--c-dark-brown);
+}
+
 /* 桌面 */
 @media (min-width: 768px) {
   .totals-grid { grid-template-columns: repeat(4, 1fr); }

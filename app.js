@@ -292,6 +292,7 @@ function onFoodDbLoaded(db) {
   Exclusion.init(db);  // 必須先於 Calc.init，因 Calc.filterFoods 會讀 Exclusion.set
   Calc.init(db);
   Records.init();
+  Pins.init();
   Trends.init();
   Sync.init();
   Reminder.init();
@@ -1439,6 +1440,7 @@ const Records = {
     this._renderPhoto(m?.photo || null);
 
     this.updateFormTotals();
+    if (typeof Pins !== 'undefined') Pins.updatePinButton();
     $('#record-form-modal').classList.remove('hidden');
   },
 
@@ -2414,6 +2416,156 @@ const Reminder = {
 };
 
 /* =============================================================
+   Pins — 釘住的餐點(首頁快速建立 + 紀錄表單釘選按鈕)
+   localStorage: cc_pinned_meals = ["餐名1","餐名2",...]
+   ============================================================= */
+const Pins = {
+  list: [],
+
+  init() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('cc_pinned_meals') || '[]');
+      this.list = Array.isArray(raw) ? raw.filter(s => typeof s === 'string') : [];
+    } catch { this.list = []; }
+
+    const pinBtn = $('#rf-pin-btn');
+    if (pinBtn) pinBtn.addEventListener('click', () => this.toggleFromForm());
+
+    const nameInput = $('#rf-name');
+    if (nameInput) nameInput.addEventListener('input', () => this.updatePinButton());
+
+    this.render();
+  },
+
+  save() {
+    localStorage.setItem('cc_pinned_meals', JSON.stringify(this.list));
+    if (typeof Sync !== 'undefined') Sync.schedulePush();
+  },
+
+  has(name) { return this.list.includes((name || '').trim()); },
+
+  add(name) {
+    name = (name || '').trim();
+    if (!name || this.has(name)) return;
+    this.list.push(name);
+    this.save();
+    this.render();
+  },
+
+  remove(name) {
+    name = (name || '').trim();
+    const before = this.list.length;
+    this.list = this.list.filter(n => n !== name);
+    if (this.list.length !== before) {
+      this.save();
+      this.render();
+    }
+  },
+
+  toggleFromForm() {
+    const name = ($('#rf-name')?.value || '').trim();
+    if (!name) return;
+    if (this.has(name)) {
+      this.remove(name);
+      showToast(`已取消釘住「${name}」`, 'warn');
+    } else {
+      this.add(name);
+      showToast(`已釘到首頁:「${name}」`, 'success');
+    }
+    this.updatePinButton();
+  },
+
+  updatePinButton() {
+    const btn = $('#rf-pin-btn');
+    if (!btn) return;
+    const name = ($('#rf-name')?.value || '').trim();
+    if (!name) {
+      btn.disabled = true;
+      btn.classList.remove('pinned');
+      btn.textContent = '📌 釘到首頁';
+      return;
+    }
+    btn.disabled = false;
+    if (this.has(name)) {
+      btn.classList.add('pinned');
+      btn.textContent = '✓ 已釘住';
+    } else {
+      btn.classList.remove('pinned');
+      btn.textContent = '📌 釘到首頁';
+    }
+  },
+
+  render() {
+    const sec = $('#pinned-meals-section');
+    const list = $('#pinned-list');
+    if (!sec || !list) return;
+    if (!this.list.length) {
+      sec.classList.add('hidden');
+      list.innerHTML = '';
+      return;
+    }
+    sec.classList.remove('hidden');
+    list.innerHTML = '';
+    this.list.forEach(name => {
+      const pill = document.createElement('button');
+      pill.className = 'pinned-pill';
+      pill.type = 'button';
+      pill.innerHTML =
+        `<span class="pinned-pill-name">${escapeHtml(name)}</span>` +
+        `<span class="pinned-pill-remove" data-act="remove" aria-label="取消釘住">✕</span>`;
+      pill.addEventListener('click', (e) => {
+        if (e.target.dataset?.act === 'remove') {
+          e.stopPropagation();
+          this.remove(name);
+          showToast(`已取消釘住「${name}」`, 'warn');
+          return;
+        }
+        this.openMealForm(name);
+      });
+      list.appendChild(pill);
+    });
+  },
+
+  /* 點擊釘住的餐點 → 找最新一筆同名紀錄;有就把食材/手動碳水帶過來,沒有就只帶餐名 */
+  openMealForm(name) {
+    const latest = (Records.meals || [])
+      .filter(x => x.name === name)
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+    if (!latest) {
+      Records.openForm({ mode: 'new' });
+      setTimeout(() => {
+        $('#rf-name').value = name;
+        $('#rf-name-source').textContent = '📌';
+        $('#rf-name-source-text').textContent = '從釘住餐點';
+        Pins.updatePinButton();
+      }, 50);
+      return;
+    }
+    const isManual = latest.input_mode === 'manual' || !(latest.foods && latest.foods.length);
+    if (isManual) {
+      Records.openForm({ mode: 'new' });
+      setTimeout(() => {
+        $('#rf-name').value = name;
+        $('#rf-name-source').textContent = '📌';
+        $('#rf-name-source-text').textContent = '從釘住餐點(上次手動)';
+        Records._setInputMode('manual');
+        $('#rf-manual-carb').value = latest.manual_carb_g != null ? latest.manual_carb_g : '';
+        $('#rf-manual-gi').value = latest.manual_gi != null ? latest.manual_gi : '';
+        Records.updateFormTotals();
+        Pins.updatePinButton();
+      }, 50);
+    } else {
+      Records.duplicateRecord(latest.id);
+      setTimeout(() => {
+        $('#rf-name-source').textContent = '📌';
+        $('#rf-name-source-text').textContent = '從釘住餐點';
+        Pins.updatePinButton();
+      }, 150);
+    }
+  },
+};
+
+/* =============================================================
    Sync — GitHub Gist 同步（Phase 6）
    ============================================================= */
 const Sync = {
@@ -2545,6 +2697,8 @@ const Sync = {
     try { gi_overrides = JSON.parse(localStorage.getItem('cc_gi_overrides') || '{}'); } catch {}
     let excluded = [];
     try { excluded = JSON.parse(localStorage.getItem('cc_excluded_foods') || '[]'); } catch {}
+    let pinned = [];
+    try { pinned = JSON.parse(localStorage.getItem('cc_pinned_meals') || '[]'); } catch {}
     const settings = {
       nickname:       lsGet(LS.NICKNAME, ''),
       ic_breakfast:   lsGet(LS.IC_BREAKFAST, '1:8.0'),
@@ -2563,6 +2717,7 @@ const Sync = {
       meals: Records.meals,
       excluded_foods: excluded,
       gi_overrides,
+      pinned_meals: pinned,
       settings,
     };
   },
@@ -2586,6 +2741,13 @@ const Sync = {
     if (snap.gi_overrides) {
       localStorage.setItem('cc_gi_overrides', JSON.stringify(snap.gi_overrides));
       if (Calc) Calc.giOverrides = snap.gi_overrides;
+    }
+    if (Array.isArray(snap.pinned_meals)) {
+      localStorage.setItem('cc_pinned_meals', JSON.stringify(snap.pinned_meals));
+      if (typeof Pins !== 'undefined') {
+        Pins.list = snap.pinned_meals.filter(s => typeof s === 'string');
+        Pins.render();
+      }
     }
     if (snap.settings) {
       const s = snap.settings;
