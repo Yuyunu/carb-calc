@@ -577,7 +577,25 @@ const Calc = {
       el.addEventListener('click', () => this.openFoodModal(this.state.selected[+el.dataset.idx].food));
     });
     wrap.querySelectorAll('.gram-input').forEach(el => {
-      el.addEventListener('input', () => this.setGrams(+el.dataset.idx, el.value));
+      // 注意:input 事件不能呼叫 setGrams 因為會 render() 重建 DOM、
+      // 讓正在打字的 input 失焦,iOS 鍵盤就會消失
+      el.addEventListener('input', () => {
+        const idx = +el.dataset.idx;
+        const g = Math.max(0, Math.min(9999, parseInt(el.value) || 0));
+        this.state.selected[idx].grams = g;
+        // 只更新本列的 meta 文字 + 上方總計,不重建整個列表
+        const row = el.closest('.sel-row');
+        if (row) {
+          const f = this.state.selected[idx].food;
+          const carbG = (f.carb_100g || 0) * g / 100;
+          const meta = row.querySelector('.sel-meta');
+          if (meta) {
+            meta.innerHTML = `碳水 ${carbG.toFixed(1)}g · GI ${this._effectiveGi(f) ?? '—'}${f.gi_confirmed ? '' : '<span style="color:var(--c-orange)"> ⚠估</span>'}`;
+          }
+        }
+        this._renderTotals();
+        this._renderDose();
+      });
     });
     wrap.querySelectorAll('.gram-btn').forEach(b => {
       b.addEventListener('click', () => {
@@ -1487,9 +1505,20 @@ const Records = {
       wrap.appendChild(row);
     });
     wrap.querySelectorAll('.gram-input').forEach(el => {
+      // 注意:input 事件只更新本列 meta + 總計,不重建列表(同主畫面 bug)
       el.addEventListener('input', () => {
-        this.formFoods[+el.dataset.idx].grams = Math.max(0, parseInt(el.value) || 0);
-        this._renderFormFoods();
+        const idx = +el.dataset.idx;
+        const g = Math.max(0, Math.min(9999, parseInt(el.value) || 0));
+        this.formFoods[idx].grams = g;
+        const row = el.closest('.sel-row');
+        if (row) {
+          const s = this.formFoods[idx];
+          const carbG = (s.food.carb_100g || 0) * g / 100;
+          const meta = row.querySelector('.sel-meta');
+          if (meta) {
+            meta.innerHTML = `碳水 ${carbG.toFixed(1)}g · GI ${s.food.gi ?? '—'}`;
+          }
+        }
         this.updateFormTotals();
       });
     });
